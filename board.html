@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Clean Room Log</title>
+
+<!-- ====== SUPABASE CONFIG — fill these in, see setup steps ====== -->
+<script>
+  window.SUPABASE_URL = "https://dgoxapyysqeojsoropao.supabase.co";
+  window.SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRnb3hhcHl5c3Flb2pzb3JvcGFvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyNjU4NjMsImV4cCI6MjEwMzg0MTg2M30.pnmATN7YsKUKVwdeWPl3tafWUOqwJUHvZOVLmemgAEQ";
+</script>
+<!-- =============================================================== -->
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+  :root {
+    --ink: #22281F; --paper: #F6F4EC; --board: #1F3D2E; --line: #DAD5C4;
+    --sage: #4C7A57; --clay: #D9832F; --card-bg: #FFFFFF; --muted: #8A8574;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { font-family: 'Inter', system-ui, sans-serif; background: var(--paper); color: var(--ink); min-height: 100vh; padding-bottom: 32px; }
+  button { font-family: inherit; cursor: pointer; }
+  button:disabled { cursor: default; opacity: 0.5; }
+  header { background: var(--board); color: #F6F4EC; padding: 18px 20px; }
+  .header-inner { max-width: 1040px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+  .title { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
+  .subtitle-link { font-size: 12.5px; color: #F6F4EC; opacity: 0.75; text-decoration: none; }
+  .progress-line { font-size: 13px; opacity: 0.85; margin-top: 6px; display: flex; align-items: center; gap: 10px; }
+  .progress-track { width: 90px; height: 5px; border-radius: 3px; background: rgba(255,255,255,0.25); overflow: hidden; display: inline-block; }
+  .progress-fill { display: block; height: 100%; background: #F2B705; border-radius: 3px; }
+  .date-nav { display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.08); border-radius: 10px; padding: 6px 8px; }
+  .date-nav button { background: transparent; border: none; color: #F6F4EC; display: flex; align-items: center; padding: 4px; border-radius: 6px; }
+  .date-label { font-size: 13px; font-weight: 500; min-width: 170px; text-align: center; }
+  .error-banner { max-width: 1040px; margin: 12px auto 0; background: #FBE4D5; color: #8A3B14; padding: 10px 16px; border-radius: 8px; font-size: 13.5px; display: none; }
+  main { max-width: 1040px; margin: 0 auto; padding: 24px 20px 0; }
+  .board { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+  .column { background: rgba(31,61,46,0.04); border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
+  .column-header { font-weight: 700; font-size: 15px; color: var(--board); margin-bottom: 8px; padding-left: 2px; }
+  .column-body { display: flex; flex-direction: column; gap: 8px; }
+  .card { background: var(--card-bg); border-radius: 10px; border: 1px solid var(--line); overflow: hidden; border-left: 4px solid var(--line); }
+  .card.pending { border-left-color: var(--clay); }
+  .card.done { border-left-color: var(--sage); }
+  .card-thumb-btn { position: relative; display: block; width: 100%; padding: 0; border: none; background: none; }
+  .thumb { width: 100%; height: 74px; object-fit: cover; display: block; }
+  .thumb-overlay { position: absolute; top: 6px; right: 6px; background: var(--sage); color: #fff; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; }
+  .upload-placeholder { width: 100%; height: 74px; background: rgba(217,131,47,0.08); color: var(--clay); display: flex; align-items: center; justify-content: center; }
+  .card-footer { display: flex; justify-content: space-between; align-items: center; padding: 6px 8px; font-size: 12px; }
+  .card-label { font-weight: 600; color: var(--ink); }
+  .card-time { color: var(--muted); font-size: 11px; }
+  .feed-section { margin-top: 32px; }
+  .feed-title { font-size: 18px; font-weight: 700; margin-bottom: 12px; }
+  .feed-empty { color: var(--muted); font-size: 14px; padding: 24px 0; display: flex; justify-content: center; }
+  .feed-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+  .feed-card { background: var(--card-bg); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; padding: 0; text-align: left; }
+  .feed-img { width: 100%; height: 120px; object-fit: cover; display: block; }
+  .feed-caption { display: flex; justify-content: space-between; font-size: 12px; padding: 8px 10px; }
+  .feed-caption-time { color: var(--muted); }
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(20,24,17,0.7); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 50; }
+  .modal-backdrop.open { display: flex; }
+  .modal-card { background: #fff; border-radius: 14px; overflow: hidden; max-width: 480px; width: 100%; }
+  .modal-img { width: 100%; max-height: 60vh; object-fit: contain; background: #111; display: block; }
+  .modal-footer { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; }
+  .modal-label { font-weight: 700; }
+  .modal-time { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .modal-close { background: var(--paper); border: none; border-radius: 8px; padding: 8px; display: flex; }
+  .spin { animation: spin 0.9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div>
+      <div class="title">Clean Room Log</div>
+      <div class="progress-line">
+        <span id="progress-text">0 of 0 groups checked in</span>
+        <span class="progress-track"><span class="progress-fill" id="progress-fill" style="width:0%"></span></span>
+      </div>
+      <a class="subtitle-link" href="upload-form.html">← Back to check-in form</a>
+    </div>
+    <div class="date-nav">
+      <button id="prev-day" aria-label="Previous day"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <div class="date-label" id="date-label">Today</div>
+      <button id="next-day" aria-label="Next day"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></button>
+    </div>
+  </div>
+</header>
+
+<div class="error-banner" id="error-banner"></div>
+
+<main>
+  <section class="board" id="board"></section>
+  <section class="feed-section">
+    <h2 class="feed-title" id="feed-title">Today's photos</h2>
+    <div id="feed-container"></div>
+  </section>
+</main>
+
+<div class="modal-backdrop" id="modal-backdrop">
+  <div class="modal-card" onclick="event.stopPropagation()">
+    <img class="modal-img" id="modal-img" src="" alt="" />
+    <div class="modal-footer">
+      <div>
+        <div class="modal-label" id="modal-label"></div>
+        <div class="modal-time" id="modal-time"></div>
+      </div>
+      <button class="modal-close" id="modal-close" aria-label="Close"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const supabase = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+
+  const GRADES = [1, 2, 3, 4, 5, 6];
+  const subCount = (g) => (g <= 3 ? 4 : 5);
+  const groupId = (g, s) => `M${g}-${s}`;
+  const groupLabel = (g, s) => `M.${g}/${s}`;
+
+  const todayStr = () => {
+    const d = new Date();
+    const off = d.getTimezoneOffset();
+    return new Date(d.getTime() - off * 60000).toISOString().slice(0, 10);
+  };
+  const fmtDateLong = (dateStr) => new Date(dateStr + "T00:00:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const fmtTime = (iso) => new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  const shiftDate = (dateStr, delta) => { const d = new Date(dateStr + "T00:00:00"); d.setDate(d.getDate() + delta); return d.toISOString().slice(0, 10); };
+
+  let currentDate = todayStr();
+  let entries = {}; // groupId -> row
+
+  function showError(msg) {
+    const el = document.getElementById("error-banner");
+    if (!msg) { el.style.display = "none"; return; }
+    el.textContent = msg;
+    el.style.display = "block";
+  }
+
+  async function loadEntries(date) {
+    entries = {};
+    const { data, error } = await supabase.from("entries").select("*").eq("entry_date", date);
+    if (error) { showError("Couldn't load entries — check your connection."); return; }
+    (data || []).forEach((row) => { entries[row.group_id] = row; });
+  }
+
+  function renderProgress() {
+    const total = GRADES.reduce((sum, g) => sum + subCount(g), 0);
+    const done = Object.keys(entries).length;
+    document.getElementById("progress-text").textContent = `${done} of ${total} groups checked in`;
+    document.getElementById("progress-fill").style.width = `${total ? (done / total) * 100 : 0}%`;
+  }
+
+  function renderDateLabel() {
+    const isToday = currentDate === todayStr();
+    document.getElementById("date-label").textContent = (isToday ? "Today · " : "") + fmtDateLong(currentDate);
+    document.getElementById("next-day").disabled = isToday;
+    document.getElementById("feed-title").textContent = isToday ? "Today's photos" : "Photos for this day";
+  }
+
+  function iconSvg(name) {
+    if (name === "check") return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>';
+    if (name === "loader") return '<svg class="spin" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>';
+    if (name === "dash") return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg>';
+    return "";
+  }
+
+  function renderBoard() {
+    const board = document.getElementById("board");
+    board.innerHTML = "";
+    GRADES.forEach((g) => {
+      const col = document.createElement("div");
+      col.className = "column";
+      const header = document.createElement("div");
+      header.className = "column-header";
+      header.textContent = `M.${g}`;
+      col.appendChild(header);
+      const body = document.createElement("div");
+      body.className = "column-body";
+      for (let s = 1; s <= subCount(g); s++) {
+        const gid = groupId(g, s);
+        const entry = entries[gid];
+        const card = document.createElement("div");
+        card.className = "card " + (entry ? "done" : "pending");
+        if (entry) {
+          const btn = document.createElement("button");
+          btn.className = "card-thumb-btn";
+          btn.innerHTML = `<img class="thumb" src="${entry.photo_url}" alt="" /><span class="thumb-overlay">${iconSvg("check")}</span>`;
+          btn.addEventListener("click", () => openModal(entry));
+          card.appendChild(btn);
+        } else {
+          card.innerHTML = `<div class="upload-placeholder">${iconSvg("dash")}</div>`;
+        }
+        const footer = document.createElement("div");
+        footer.className = "card-footer";
+        footer.innerHTML = `<span class="card-label">${groupLabel(g, s)}</span><span class="card-time">${entry ? fmtTime(entry.created_at) : "pending"}</span>`;
+        card.appendChild(footer);
+        body.appendChild(card);
+      }
+      col.appendChild(body);
+      board.appendChild(col);
+    });
+  }
+
+  function renderFeed() {
+    const container = document.getElementById("feed-container");
+    const feed = Object.values(entries).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    if (feed.length === 0) {
+      container.innerHTML = `<div class="feed-empty">No photos uploaded for this day yet.</div>`;
+      return;
+    }
+    const grid = document.createElement("div");
+    grid.className = "feed-grid";
+    feed.forEach((entry) => {
+      const card = document.createElement("button");
+      card.className = "feed-card";
+      card.innerHTML = `<img class="feed-img" src="${entry.photo_url}" alt="" /><div class="feed-caption"><span>${entry.label}</span><span class="feed-caption-time">${fmtTime(entry.created_at)}</span></div>`;
+      card.addEventListener("click", () => openModal(entry));
+      grid.appendChild(card);
+    });
+    container.innerHTML = "";
+    container.appendChild(grid);
+  }
+
+  function openModal(entry) {
+    document.getElementById("modal-img").src = entry.photo_url;
+    document.getElementById("modal-label").textContent = entry.label;
+    document.getElementById("modal-time").textContent = `${fmtTime(entry.created_at)} · ${fmtDateLong(currentDate)}`;
+    document.getElementById("modal-backdrop").classList.add("open");
+  }
+  function closeModal() { document.getElementById("modal-backdrop").classList.remove("open"); }
+
+  async function goToDate(newDate) {
+    currentDate = newDate;
+    renderDateLabel();
+    document.getElementById("feed-container").innerHTML = `<div class="feed-empty">${iconSvg("loader")}</div>`;
+    document.getElementById("board").innerHTML = "";
+    showError("");
+    await loadEntries(currentDate);
+    renderBoard();
+    renderFeed();
+    renderProgress();
+  }
+
+  document.getElementById("prev-day").addEventListener("click", () => goToDate(shiftDate(currentDate, -1)));
+  document.getElementById("next-day").addEventListener("click", () => { if (currentDate !== todayStr()) goToDate(shiftDate(currentDate, 1)); });
+  document.getElementById("modal-backdrop").addEventListener("click", closeModal);
+  document.getElementById("modal-close").addEventListener("click", closeModal);
+
+  goToDate(currentDate);
+</script>
+</body>
+</html>
