@@ -25,7 +25,7 @@ document.getElementById("today-label").textContent = new Date().toLocaleDateStri
 gradeEl.addEventListener("change", () => {
   const g = parseInt(gradeEl.value, 10);
   sectionEl.innerHTML = `<option value="" disabled selected>Select section</option>`;
-  for (let s = 1; s <= subCount(g); s++) {
+  for (let s = 1; s <= g; s++) {
     const opt = document.createElement("option");
     opt.value = s;
     opt.textContent = `Section ${s}`;
