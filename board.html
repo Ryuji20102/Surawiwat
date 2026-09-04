@@ -77,10 +77,10 @@
     <div>
       <div class="title">Clean Room Log</div>
       <div class="progress-line">
-        <span id="progress-text">0 of 27 groups checked in</span>
+        <span id="progress-text">0 of 0 groups checked in</span>
         <span class="progress-track"><span class="progress-fill" id="progress-fill" style="width:0%"></span></span>
       </div>
-      <a class="subtitle-link" href="index.html">← Back to check-in form</a>
+      <a class="subtitle-link" href="upload-form.html">← Back to check-in form</a>
     </div>
     <div class="date-nav">
       <button id="prev-day" aria-label="Previous day"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg></button>
@@ -114,7 +114,18 @@
 </div>
 
 <script>
-  const supabase = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+  let sb = null;
+  try {
+    if (
+      window.SUPABASE_URL && window.SUPABASE_ANON_KEY &&
+      !window.SUPABASE_URL.includes("YOUR_SUPABASE") &&
+      !window.SUPABASE_ANON_KEY.includes("YOUR_SUPABASE")
+    ) {
+      sb = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+    }
+  } catch (e) {
+    sb = null;
+  }
 
   const GRADES = [1, 2, 3, 4, 5, 6];
   const subCount = (g) => (g <= 3 ? 4 : 5);
@@ -142,7 +153,11 @@
 
   async function loadEntries(date) {
     entries = {};
-    const { data, error } = await supabase.from("entries").select("*").eq("entry_date", date);
+    if (!sb) {
+      showError("This page isn't connected to a database yet — check the SUPABASE_URL/KEY at the top of the file.");
+      return;
+    }
+    const { data, error } = await sb.from("entries").select("*").eq("entry_date", date);
     if (error) { showError("Couldn't load entries — check your connection."); return; }
     (data || []).forEach((row) => { entries[row.group_id] = row; });
   }
