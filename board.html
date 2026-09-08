@@ -139,7 +139,12 @@
   };
   const fmtDateLong = (dateStr) => new Date(dateStr + "T00:00:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
   const fmtTime = (iso) => new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-  const shiftDate = (dateStr, delta) => { const d = new Date(dateStr + "T00:00:00"); d.setDate(d.getDate() + delta); return d.toISOString().slice(0, 10); };
+  const shiftDate = (dateStr, delta) => {
+    const [y, m, d] = dateStr.split("-").map(Number);
+    const dt = new Date(Date.UTC(y, m - 1, d));
+    dt.setUTCDate(dt.getUTCDate() + delta);
+    return dt.toISOString().slice(0, 10);
+  };
 
   let currentDate = todayStr();
   let entries = {}; // groupId -> row
