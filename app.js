@@ -7,6 +7,8 @@
   const photoInput = document.getElementById("photo-input");
   const submitBtn = document.getElementById("submit-btn");
   const statusMsg = document.getElementById("status-msg");
+  const roomInUseEl = document.getElementById("room-in-use");
+  const useToggleLabel = document.getElementById("use-toggle-label");
   const form = document.getElementById("checkin-form");
 
   let photoBlob = null;
@@ -33,6 +35,10 @@
     updateSubmitState();
   });
   sectionEl.addEventListener("change", updateSubmitState);
+
+  roomInUseEl.addEventListener("change", () => {
+    useToggleLabel.classList.toggle("active", roomInUseEl.checked);
+  });
 
   let sb = null;
   try {
@@ -155,6 +161,7 @@
           label,
           entry_date: date,
           photo_url: pub.publicUrl,
+          room_in_use: roomInUseEl.checked,
         },
         { onConflict: "group_id,entry_date" }
       );
@@ -163,6 +170,8 @@
       showStatus(`✓ ${label} checked in!`, "success");
       form.reset();
       photoBlob = null;
+      roomInUseEl.checked = false;
+      useToggleLabel.classList.remove("active");
       sectionEl.innerHTML = `<option value="" disabled selected>Select grade first</option>`;
       sectionEl.disabled = true;
       resetPhotoZone();

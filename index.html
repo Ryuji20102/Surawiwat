@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
-<title>บันทึกการทำความสะอาดห้องเรียน</title>
+<title>Clean Room Check-in</title>
 
 <!-- ====== SUPABASE CONFIG — fill these in, see setup steps ====== -->
 <script>
@@ -116,6 +116,23 @@
   }
   .submit-btn:disabled { background: var(--line); color: var(--muted); }
 
+  .use-toggle {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--card-bg);
+    border: 1.5px solid var(--line);
+    border-radius: 12px;
+    padding: 14px 16px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .use-toggle.active { border-color: var(--clay); background: rgba(217,131,47,0.08); }
+  .use-toggle input { width: 20px; height: 20px; accent-color: var(--clay); flex-shrink: 0; }
+  .use-toggle span { font-size: 15px; font-weight: 600; }
+  .use-toggle small { display: block; font-weight: 400; font-size: 12.5px; color: var(--muted); margin-top: 1px; }
+
+
   .status-msg {
     font-size: 13.5px;
     text-align: center;
@@ -156,7 +173,7 @@
     </div>
 
     <div>
-      <label for="section">Section</label>
+      <label for="section">Section / Group</label>
       <select id="section" required disabled>
         <option value="" disabled selected>Select grade first</option>
       </select>
@@ -175,12 +192,17 @@
 
     <div class="status-msg" id="status-msg"></div>
 
+    <label class="use-toggle" id="use-toggle-label" for="room-in-use">
+      <input type="checkbox" id="room-in-use" />
+      <span>มีคนใช้ห้องอยู่<small>Check this if the room is being used</small></span>
+    </label>
+
     <button type="submit" class="submit-btn" id="submit-btn" disabled>Submit</button>
   </form>
 
   <footer><a href="board.html">View today's board →</a></footer>
 </div>
 
-<script src = "app.js"></script>
+<script src="app.js"></script>
 </body>
 </html>

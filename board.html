@@ -33,7 +33,13 @@
   .progress-fill { display: block; height: 100%; background: #F2B705; border-radius: 3px; }
   .date-nav { display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.08); border-radius: 10px; padding: 6px 8px; }
   .date-nav button { background: transparent; border: none; color: #F6F4EC; display: flex; align-items: center; padding: 4px; border-radius: 6px; }
-  .date-label { font-size: 13px; font-weight: 500; min-width: 170px; text-align: center; }
+  .date-label { font-size: 13px; font-weight: 500; min-width: 170px; text-align: center; background: none; border: none; color: #F6F4EC; cursor: pointer; padding: 4px 2px; display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .date-label:hover { text-decoration: underline; }
+  .date-picker-wrap { position: relative; display: inline-flex; }
+  .date-picker-wrap input[type="date"] {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    opacity: 0; cursor: pointer; border: none; padding: 0;
+  }
   .error-banner { max-width: 1040px; margin: 12px auto 0; background: #FBE4D5; color: #8A3B14; padding: 10px 16px; border-radius: 8px; font-size: 13.5px; display: none; }
   main { max-width: 1040px; margin: 0 auto; padding: 24px 20px 0; }
   .board { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
@@ -46,6 +52,8 @@
   .card-thumb-btn { position: relative; display: block; width: 100%; padding: 0; border: none; background: none; }
   .thumb { width: 100%; height: 74px; object-fit: cover; display: block; }
   .thumb-overlay { position: absolute; top: 6px; right: 6px; background: var(--sage); color: #fff; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; }
+  .in-use-badge { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(217,131,47,0.92); color: #fff; font-size: 10.5px; font-weight: 700; text-align: center; padding: 3px 4px; letter-spacing: 0.02em; }
+  .card.in-use { border-left-color: var(--clay); }
   .upload-placeholder { width: 100%; height: 74px; background: rgba(217,131,47,0.08); color: var(--clay); display: flex; align-items: center; justify-content: center; }
   .card-footer { display: flex; justify-content: space-between; align-items: center; padding: 6px 8px; font-size: 12px; }
   .card-label { font-weight: 600; color: var(--ink); }
@@ -84,7 +92,13 @@
     </div>
     <div class="date-nav">
       <button id="prev-day" aria-label="Previous day"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg></button>
-      <div class="date-label" id="date-label">Today</div>
+      <div class="date-picker-wrap">
+        <button class="date-label" id="date-label" type="button">
+          Today
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        </button>
+        <input type="date" id="date-input" aria-label="Choose a date" />
+      </div>
       <button id="next-day" aria-label="Next day"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></button>
     </div>
   </div>
@@ -176,7 +190,10 @@
 
   function renderDateLabel() {
     const isToday = currentDate === todayStr();
-    document.getElementById("date-label").textContent = (isToday ? "Today · " : "") + fmtDateLong(currentDate);
+    const calIcon = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>';
+    document.getElementById("date-label").innerHTML =
+      (isToday ? "Today · " : "") + fmtDateLong(currentDate) + calIcon;
+    document.getElementById("date-input").value = currentDate;
     document.getElementById("next-day").disabled = isToday;
     document.getElementById("feed-title").textContent = isToday ? "Today's photos" : "Photos for this day";
   }
@@ -204,11 +221,11 @@
         const gid = groupId(g, s);
         const entry = entries[gid];
         const card = document.createElement("div");
-        card.className = "card " + (entry ? "done" : "pending");
+        card.className = "card " + (entry ? (entry.room_in_use ? "done in-use" : "done") : "pending");
         if (entry) {
           const btn = document.createElement("button");
           btn.className = "card-thumb-btn";
-          btn.innerHTML = `<img class="thumb" src="${entry.photo_url}" alt="" /><span class="thumb-overlay">${iconSvg("check")}</span>`;
+          btn.innerHTML = `<img class="thumb" src="${entry.photo_url}" alt="" /><span class="thumb-overlay">${iconSvg("check")}</span>${entry.room_in_use ? '<span class="in-use-badge">IN USE</span>' : ""}`;
           btn.addEventListener("click", () => openModal(entry));
           card.appendChild(btn);
         } else {
@@ -237,7 +254,7 @@
     feed.forEach((entry) => {
       const card = document.createElement("button");
       card.className = "feed-card";
-      card.innerHTML = `<img class="feed-img" src="${entry.photo_url}" alt="" /><div class="feed-caption"><span>${entry.label}</span><span class="feed-caption-time">${fmtTime(entry.created_at)}</span></div>`;
+      card.innerHTML = `<img class="feed-img" src="${entry.photo_url}" alt="" /><div class="feed-caption"><span>${entry.label}${entry.room_in_use ? ' <span style="color: var(--clay); font-weight:700;">· in use</span>' : ""}</span><span class="feed-caption-time">${fmtTime(entry.created_at)}</span></div>`;
       card.addEventListener("click", () => openModal(entry));
       grid.appendChild(card);
     });
@@ -247,7 +264,7 @@
 
   function openModal(entry) {
     document.getElementById("modal-img").src = entry.photo_url;
-    document.getElementById("modal-label").textContent = entry.label;
+    document.getElementById("modal-label").textContent = entry.label + (entry.room_in_use ? " — Room in use" : "");
     document.getElementById("modal-time").textContent = `${fmtTime(entry.created_at)} · ${fmtDateLong(currentDate)}`;
     document.getElementById("modal-backdrop").classList.add("open");
   }
@@ -267,6 +284,15 @@
 
   document.getElementById("prev-day").addEventListener("click", () => goToDate(shiftDate(currentDate, -1)));
   document.getElementById("next-day").addEventListener("click", () => { if (currentDate !== todayStr()) goToDate(shiftDate(currentDate, 1)); });
+
+  const dateInput = document.getElementById("date-input");
+  dateInput.max = todayStr();
+  dateInput.addEventListener("change", () => { if (dateInput.value) goToDate(dateInput.value); });
+  document.getElementById("date-label").addEventListener("click", () => {
+    if (dateInput.showPicker) dateInput.showPicker();
+    else dateInput.focus();
+  });
+
   document.getElementById("modal-backdrop").addEventListener("click", closeModal);
   document.getElementById("modal-close").addEventListener("click", closeModal);
 
