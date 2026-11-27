@@ -14,16 +14,14 @@
 
 <!-- ====== CHECKLIST CONFIG — edit the items below to customize ====== -->
 <script>
-  // Shown in a popup after the student taps Submit.
-  // Add, remove, or reword items freely. Leave the list empty ([]) to skip the popup.
+  // FALLBACK checklist. The page normally loads checklist.json (same folder) instead,
+  // so you can edit that file without touching this one. These values are only used
+  // if checklist.json is missing or can't be loaded.
   window.CHECKLIST_TITLE = "Cleaning checklist";
   window.CHECKLIST_SUBTITLE = "Confirm everything is done before uploading.";
   window.CHECKLIST_ITEMS = [
-	"ยกเก้าอี้",
-	"จัดโต๊ะ",
-	"ปิดไฟ",
-	"ปิดโปรเจ็กเตอร์",
-	"ปิดคอมพิวเตอร์",
+    "Yo smth wrong with checklist.json bro",
+    "Go check it out",
   ];
   // true  = every box must be ticked before "Confirm & upload" works
   // false = students can upload without ticking everything
@@ -471,6 +469,21 @@
     }
   }
 
+  // ---- Load checklist.json (overrides the fallback defaults above) ----
+  const checklistReady = (async () => {
+    try {
+      const res = await fetch("checklist.json", { cache: "no-cache" });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const cfg = await res.json();
+      if (Array.isArray(cfg.items)) window.CHECKLIST_ITEMS = cfg.items.map(String);
+      if (typeof cfg.title === "string") window.CHECKLIST_TITLE = cfg.title;
+      if (typeof cfg.subtitle === "string") window.CHECKLIST_SUBTITLE = cfg.subtitle;
+      if (typeof cfg.requireAll === "boolean") window.CHECKLIST_REQUIRE_ALL = cfg.requireAll;
+    } catch (err) {
+      console.warn("Couldn't load checklist.json, using the built-in checklist.", err);
+    }
+  })();
+
   // ---- Checklist popup ----
   const clBackdrop = document.getElementById("cl-backdrop");
   const clList = document.getElementById("cl-list");
@@ -518,12 +531,13 @@
     doUpload();
   });
 
-  form.addEventListener("submit", (e) => {
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
     if (!sb) {
       showStatus("This form isn't connected to a database yet — check the SUPABASE_URL/KEY at the top of the file.", "error");
       return;
     }
+    await checklistReady;
     if ((window.CHECKLIST_ITEMS || []).length === 0) doUpload();
     else openChecklist();
   });
