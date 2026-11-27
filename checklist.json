@@ -1,0 +1,16 @@
+{
+  "title": "Cleaning checklist",
+  "subtitle": "Confirm everything is done before uploading.",
+  "requireAll": true,
+  "items": [
+	"ยกเก้าอี้",
+	"จัดโต๊ะ",
+	"กวาดพื้น",
+	"ปิดไฟ",
+	"ปิดโปรเจ็กเตอร์",
+	"ปิดคอมพิวเตอร์",
+	"ปิดเครื่องเสียง",
+	"ปิดพัดลมระบายอากาศ",
+	"ปิดสำรองไฟ"
+  ]
+}
