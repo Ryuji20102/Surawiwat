@@ -12,6 +12,25 @@
 </script>
 <!-- =============================================================== -->
 
+<!-- ====== CHECKLIST CONFIG — edit the items below to customize ====== -->
+<script>
+  // Shown in a popup after the student taps Submit.
+  // Add, remove, or reword items freely. Leave the list empty ([]) to skip the popup.
+  window.CHECKLIST_TITLE = "Cleaning checklist";
+  window.CHECKLIST_SUBTITLE = "Confirm everything is done before uploading.";
+  window.CHECKLIST_ITEMS = [
+	"ยกเก้าอี้",
+	"จัดโต๊ะ",
+	"ปิดไฟ",
+	"ปิดโปรเจ็กเตอร์",
+	"ปิดคอมพิวเตอร์",
+  ];
+  // true  = every box must be ticked before "Confirm & upload" works
+  // false = students can upload without ticking everything
+  window.CHECKLIST_REQUIRE_ALL = true;
+</script>
+<!-- ================================================================== -->
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <style>
@@ -27,15 +46,21 @@
   }
   * { box-sizing: border-box; }
   html, body {
-    margin: 0; padding: 0; height: 100%;
+    margin: 0; padding: 0; min-height: 100%;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     background: var(--paper);
     color: var(--ink);
   }
-  .wrap {
-    max-width: 1920px;
-    margin: 0 auto;
+  body {
     min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+  }
+  .wrap {
+    width: 100%;
+    max-width: 640px;
+    margin: 0 auto;
+    flex: 1;
     display: flex;
     flex-direction: column;
   }
@@ -147,16 +172,59 @@
   .spin { animation: spin 0.9s linear infinite; display: inline-flex; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
+
+  /* ---- Checklist popup ---- */
+  .cl-backdrop {
+    position: fixed; inset: 0; background: rgba(20,24,17,0.6);
+    display: none; align-items: flex-end; justify-content: center;
+    z-index: 100; padding: 0;
+  }
+  .cl-backdrop.open { display: flex; }
+  .cl-card {
+    background: var(--card-bg); width: 100%; max-width: 440px;
+    border-radius: 18px 18px 0 0; padding: 22px 20px 20px;
+    max-height: 90dvh; overflow-y: auto;
+  }
+  @media (min-width: 600px) {
+    .cl-backdrop { align-items: center; padding: 20px; }
+    .cl-card { border-radius: 18px; }
+  }
+  .cl-card h2 { margin: 0 0 4px; font-size: 19px; }
+  .cl-card p.cl-sub { margin: 0 0 16px; font-size: 13.5px; color: var(--muted); }
+  .cl-selectall {
+    background: none; border: 1.5px solid var(--sage); color: var(--sage);
+    border-radius: 10px; padding: 8px 14px; font-size: 13.5px; font-weight: 700;
+    margin-bottom: 12px; cursor: pointer; font-family: inherit;
+  }
+  .cl-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 13px 12px; border: 1.5px solid var(--line);
+    border-radius: 12px; margin-bottom: 8px; cursor: pointer; user-select: none;
+    font-size: 15px;
+  }
+  .cl-item.checked { border-color: var(--sage); background: rgba(76,122,87,0.08); }
+  .cl-item input { width: 20px; height: 20px; accent-color: var(--sage); flex-shrink: 0; }
+  .cl-actions { display: flex; gap: 10px; margin-top: 16px; }
+  .cl-actions button {
+    flex: 1; padding: 14px; border-radius: 12px; border: none;
+    font-size: 15.5px; font-weight: 700;
+  }
+  .cl-cancel { background: var(--paper); color: var(--ink); }
+  .cl-confirm { background: var(--sage); color: #fff; }
+  .cl-confirm:disabled { background: var(--line); color: var(--muted); }
+
   footer { text-align: center; padding: 14px; }
   footer a { font-size: 12.5px; color: var(--muted); text-decoration: none; }
 </style>
 </head>
 <body>
-<div class="wrap">
   <header>
-    <h1>บันทึกการทำความสะอาดห้องเรียน</h1>
+    <h1>Clean Room Check-in</h1>
     <p id="today-label"></p>
   </header>
+
+<div class="wrap">
+
 
   <form id="checkin-form">
     <div>
@@ -173,7 +241,7 @@
     </div>
 
     <div>
-      <label for="section">Room</label>
+      <label for="section">Section / Group</label>
       <select id="section" required disabled>
         <option value="" disabled selected>Select grade first</option>
       </select>
@@ -194,7 +262,7 @@
 
     <label class="use-toggle" id="use-toggle-label" for="room-in-use">
       <input type="checkbox" id="room-in-use" />
-      <span>มีคนใช้ห้องอยู่<small>Check this if the room is being used</small></span>
+      <span>Room is in use<small>Check this if the room can't be used right now</small></span>
     </label>
 
     <button type="submit" class="submit-btn" id="submit-btn" disabled>Submit</button>
@@ -203,6 +271,262 @@
   <footer><a href="board.html">View today's board →</a></footer>
 </div>
 
-<script src="app.js"></script>
+<!-- Checklist popup (items come from CHECKLIST_ITEMS at the top of the file) -->
+<div class="cl-backdrop" id="cl-backdrop">
+  <div class="cl-card" role="dialog" aria-modal="true" aria-labelledby="cl-title">
+    <h2 id="cl-title"></h2>
+    <p class="cl-sub" id="cl-sub"></p>
+    <button type="button" class="cl-selectall" id="cl-selectall">Select all</button>
+    <div id="cl-list"></div>
+    <div class="cl-actions">
+      <button type="button" class="cl-cancel" id="cl-cancel">Cancel</button>
+      <button type="button" class="cl-confirm" id="cl-confirm">Confirm &amp; upload</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const subCount = (g) => (g <= 3 ? 4 : 5);
+
+  const gradeEl = document.getElementById("grade");
+  const sectionEl = document.getElementById("section");
+  const photoZone = document.getElementById("photo-zone");
+  const photoBtn = document.getElementById("photo-btn");
+  const photoInput = document.getElementById("photo-input");
+  const submitBtn = document.getElementById("submit-btn");
+  const statusMsg = document.getElementById("status-msg");
+  const roomInUseEl = document.getElementById("room-in-use");
+  const useToggleLabel = document.getElementById("use-toggle-label");
+  const form = document.getElementById("checkin-form");
+
+  let photoBlob = null;
+
+  const todayStr = () => {
+    const d = new Date();
+    const off = d.getTimezoneOffset();
+    return new Date(d.getTime() - off * 60000).toISOString().slice(0, 10);
+  };
+  document.getElementById("today-label").textContent = new Date().toLocaleDateString("en-GB", {
+    weekday: "long", day: "numeric", month: "long",
+  });
+
+  gradeEl.addEventListener("change", () => {
+    const g = parseInt(gradeEl.value, 10);
+    sectionEl.innerHTML = `<option value="" disabled selected>Select section</option>`;
+    for (let s = 1; s <= subCount(g); s++) {
+      const opt = document.createElement("option");
+      opt.value = s;
+      opt.textContent = `Section ${s}`;
+      sectionEl.appendChild(opt);
+    }
+    sectionEl.disabled = false;
+    updateSubmitState();
+  });
+  sectionEl.addEventListener("change", updateSubmitState);
+
+  roomInUseEl.addEventListener("change", () => {
+    useToggleLabel.classList.toggle("active", roomInUseEl.checked);
+  });
+
+  let sb = null;
+  try {
+    if (
+      window.SUPABASE_URL && window.SUPABASE_ANON_KEY &&
+      !window.SUPABASE_URL.includes("YOUR_SUPABASE") &&
+      !window.SUPABASE_ANON_KEY.includes("YOUR_SUPABASE")
+    ) {
+      sb = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+    } else {
+      showStatus("This form isn't connected to a database yet — check the SUPABASE_URL/KEY at the top of the file.", "error");
+      submitBtn.disabled = true;
+    }
+  } catch (e) {
+    showStatus("Couldn't connect to the database — check the SUPABASE_URL/KEY at the top of the file.", "error");
+    submitBtn.disabled = true;
+  }
+
+  function compressImage(file, maxDim = 900, quality = 0.62) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error("read failed"));
+      reader.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error("decode failed"));
+        img.onload = () => {
+          let { width, height } = img;
+          if (width > height && width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+          canvas.toBlob((blob) => resolve(blob), "image/jpeg", quality);
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function resetPhotoZone() {
+    photoZone.classList.remove("has-photo");
+    photoZone.innerHTML = `
+      <button type="button" class="photo-btn" id="photo-btn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        Take / choose photo
+      </button>
+      <input type="file" id="photo-input" accept="image/*" capture="environment" />`;
+    wirePhotoInput();
+  }
+
+  function wirePhotoInput() {
+    const btn = document.getElementById("photo-btn");
+    const input = document.getElementById("photo-input");
+    btn.addEventListener("click", () => input.click());
+    input.addEventListener("change", async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      photoBlob = await compressImage(file);
+      const url = URL.createObjectURL(photoBlob);
+      photoZone.classList.add("has-photo");
+      photoZone.innerHTML = `<img class="photo-preview" src="${url}" alt="" />`;
+      const retakeBtn = document.createElement("button");
+      retakeBtn.type = "button";
+      retakeBtn.className = "photo-btn retake";
+      retakeBtn.style.borderRadius = "0";
+      retakeBtn.textContent = "Retake photo";
+      retakeBtn.addEventListener("click", () => document.getElementById("photo-input").click());
+      photoZone.appendChild(retakeBtn);
+      updateSubmitState();
+    });
+  }
+  wirePhotoInput();
+
+  function updateSubmitState() {
+    submitBtn.disabled = !(gradeEl.value && sectionEl.value && photoBlob);
+  }
+
+  function showStatus(msg, type) {
+    statusMsg.textContent = msg;
+    statusMsg.className = `status-msg show ${type}`;
+  }
+
+  async function doUpload() {
+    if (!sb) {
+      showStatus("This form isn't connected to a database yet — check the SUPABASE_URL/KEY at the top of the file.", "error");
+      return;
+    }
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `<span class="spin"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg></span> Uploading…`;
+    showStatus("", "");
+
+    const grade = parseInt(gradeEl.value, 10);
+    const sub = parseInt(sectionEl.value, 10);
+    const groupId = `M${grade}-${sub}`;
+    const label = `M.${grade}/${sub}`;
+    const date = todayStr();
+    const path = `${date}/${groupId}.jpg`;
+
+    try {
+      const { error: uploadError } = await sb.storage
+        .from("photos")
+        .upload(path, photoBlob, { contentType: "image/jpeg", upsert: true });
+      if (uploadError) throw uploadError;
+
+      const { data: pub } = sb.storage.from("photos").getPublicUrl(path);
+
+      const { error: dbError } = await sb.from("entries").upsert(
+        {
+          group_id: groupId,
+          grade,
+          sub,
+          label,
+          entry_date: date,
+          photo_url: pub.publicUrl,
+          room_in_use: roomInUseEl.checked,
+        },
+        { onConflict: "group_id,entry_date" }
+      );
+      if (dbError) throw dbError;
+
+      showStatus(`✓ ${label} checked in!`, "success");
+      form.reset();
+      photoBlob = null;
+      roomInUseEl.checked = false;
+      useToggleLabel.classList.remove("active");
+      sectionEl.innerHTML = `<option value="" disabled selected>Select grade first</option>`;
+      sectionEl.disabled = true;
+      resetPhotoZone();
+    } catch (err) {
+      showStatus("Upload failed — check your connection and try again.", "error");
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Submit";
+      updateSubmitState();
+    }
+  }
+
+  // ---- Checklist popup ----
+  const clBackdrop = document.getElementById("cl-backdrop");
+  const clList = document.getElementById("cl-list");
+  const clConfirm = document.getElementById("cl-confirm");
+
+  function updateChecklistState() {
+    const boxes = clList.querySelectorAll("input[type=checkbox]");
+    boxes.forEach((b) => b.closest(".cl-item").classList.toggle("checked", b.checked));
+    const allDone = [...boxes].every((b) => b.checked);
+    clConfirm.disabled = window.CHECKLIST_REQUIRE_ALL !== false && !allDone;
+    document.getElementById("cl-selectall").textContent = allDone ? "Clear all" : "Select all";
+  }
+
+  function openChecklist() {
+    document.getElementById("cl-title").textContent = window.CHECKLIST_TITLE || "Checklist";
+    document.getElementById("cl-sub").textContent = window.CHECKLIST_SUBTITLE || "";
+    clList.innerHTML = "";
+    (window.CHECKLIST_ITEMS || []).forEach((text) => {
+      const row = document.createElement("label");
+      row.className = "cl-item";
+      const box = document.createElement("input");
+      box.type = "checkbox";
+      box.addEventListener("change", updateChecklistState);
+      const span = document.createElement("span");
+      span.textContent = text;
+      row.appendChild(box);
+      row.appendChild(span);
+      clList.appendChild(row);
+    });
+    updateChecklistState();
+    clBackdrop.classList.add("open");
+  }
+  function closeChecklist() { clBackdrop.classList.remove("open"); }
+
+  document.getElementById("cl-selectall").addEventListener("click", () => {
+    const boxes = clList.querySelectorAll("input[type=checkbox]");
+    const allDone = [...boxes].every((b) => b.checked);
+    boxes.forEach((b) => { b.checked = !allDone; });
+    updateChecklistState();
+  });
+
+  document.getElementById("cl-cancel").addEventListener("click", closeChecklist);
+  clConfirm.addEventListener("click", () => {
+    closeChecklist();
+    doUpload();
+  });
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    if (!sb) {
+      showStatus("This form isn't connected to a database yet — check the SUPABASE_URL/KEY at the top of the file.", "error");
+      return;
+    }
+    if ((window.CHECKLIST_ITEMS || []).length === 0) doUpload();
+    else openChecklist();
+  });
+</script>
 </body>
 </html>
